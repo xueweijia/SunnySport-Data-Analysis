@@ -1,5 +1,5 @@
-# This R Script reads an xlsx file containing raw card swiping data from bjfu.sunnysport.org.cn,
-# and mainly process datetime data. The analysis items include(item - output):
+# This R Script reads an xlsx file containing raw data from bjfu.sunnysport.org.cn,
+# and mainly process for datetime. Analysis items include(item - output):
 # Number of Grade&Zone runners by grade and timespan - 1 xlsx file
 # Daily runner flow by week - 1 line graph
 # Daily runner flow by weekday - 1 density graph
@@ -8,10 +8,10 @@
 # Machines' usage ratio - 1 xlsx file
 #
 # Author: @JiaXuewei
-# Time: 2018.10.17
-# Last Update Time: 2018.10.17
+# Created at: 2018.10.17
+# Last Update: 2018.11.28
 
-thisWeek<-4
+thisWeek<-""
 dirPath<-"C:/Users/asjxw/Desktop/TimeAnalysis/"
 if(!file.exists(dirPath)){ dir.create(dirPath) }
 dirPath<-paste("C:/Users/asjxw/Desktop/TimeAnalysis/", "Week", as.character(thisWeek), sep = "", collapse = "")
@@ -66,17 +66,18 @@ data[["Zone"]]<-parApply(cl, data["Location"], 1, returnZone)
 stopCluster(cl)
 
 data[["Week"]]<-floor(difftime(as.Date(data$Date), as.Date("2018-09-17"), units = "weeks"))
+data<-subset(data, Week >= 0)
 data$Week<-as.numeric(as.character(data$Week)) + 1
 if (thisWeek != "") { data<-subset(data, Week==thisWeek) }
 if (thisWeek == "") { weekAmount<-max(data$Week) } else { weekAmount<-1 }
 
 returnWeek<-function(week) {
-  switch(week, "第一周", "第二周", "第三周", "第四周")
+  switch(week, "第一周", "第二周", "第三周", "第四周", "第五周", "第六周", "第七周", "第八周", "第九周", "第十周")
 }
 cl<-makeCluster(4)
 data$Week<-parApply(cl, data["Week"], 1, returnWeek)
 stopCluster(cl)
-data$Week<-factor(data$Week, levels = c("第一周", "第二周", "第三周", "第四周"))
+data$Week<-factor(data$Week, levels = c("第一周", "第二周", "第三周", "第四周", "第五周", "第六周", "第七周", "第八周", "第九周", "第十周"))
 
 # CleasingData, DataBackup, deduplication
 sdata<-data
@@ -127,31 +128,25 @@ colnames(weekdaySummary)<-c("Weekday", "TimeSpan", "East", "East17", "East18", "
 write.xlsx(weekdaySummary, "Summary.xlsx")
 
 
-workday<-subset(total, total$Weekday != "星期六" & total$Weekday != "星期日")
+weekday<-subset(total, total$Weekday != "星期六" & total$Weekday != "星期日")
 weekend<-subset(total, total$Weekday == "星期六" | total$Weekday == "星期日")
-countTime<-function(data, x1, x2, time) {
-  c(time >= data[x1] & time <= data[x2] & data["Grade"] == "17",
-    time >= data[x1] & time <= data[x2] & data["Grade"] == "17" & data["Zone"] == "东区",
-    time >= data[x1] & time <= data[x2] & data["Grade"] == "17" & data["Zone"] == "西区",
-    time >= data[x1] & time <= data[x2] & data["Grade"] == "18", 
-    time >= data[x1] & time <= data[x2] & data["Grade"] == "18" & data["Zone"] == "东区",
-    time >= data[x1] & time <= data[x2] & data["Grade"] == "18" & data["Zone"] == "西区" )
-}
 
 countTime<-function(data, x1, x2, time) {
-  c(time >= data[x1] & time <= data[x1] & data["Grade"] == "17",
-    time >= data[x1] & time <= data[x1] & data["Grade"] == "17" & data["Zone"] == "东区",
-    time >= data[x1] & time <= data[x1] & data["Grade"] == "17" & data["Zone"] == "西区",
-    time >= data[x1] & time <= data[x1] & data["Grade"] == "18", 
-    time >= data[x1] & time <= data[x1] & data["Grade"] == "18" & data["Zone"] == "东区",
-    time >= data[x1] & time <= data[x1] & data["Grade"] == "18" & data["Zone"] == "西区" )
+  c(time >= data[x1] & time <= data[x2] & data["Grade"] == "17",
+    # time >= data[x1] & time <= data[x2] & data["Grade"] == "17" & data["Zone"] == "东区",
+    # time >= data[x1] & time <= data[x2] & data["Grade"] == "17" & data["Zone"] == "西区",
+    time >= data[x1] & time <= data[x2] & data["Grade"] == "18"#, 
+    # time >= data[x1] & time <= data[x2] & data["Grade"] == "18" & data["Zone"] == "东区",
+    # time >= data[x1] & time <= data[x2] & data["Grade"] == "18" & data["Zone"] == "西区" 
+    )
 }
 
 setTimeNo<-function(weM, whichDayData, countTime, time, totalDay) {
   result<-apply(whichDayData, 1, countTime, "Time", "EndTime", weM[time])
-  cbind(round(length(which(result[1,]) == TRUE)/totalDay), round(length(which(result[2,]) == TRUE)/totalDay),
-        round(length(which(result[3,]) == TRUE)/totalDay), round(length(which(result[4,]) == TRUE)/totalDay),
-        round(length(which(result[5,]) == TRUE)/totalDay), round(length(which(result[6,]) == TRUE)/totalDay))
+  cbind(round(length(which(result[1,]) == TRUE)/totalDay), round(length(which(result[2,]) == TRUE)/totalDay)#,
+        #round(length(which(result[3,]) == TRUE)/totalDay), round(length(which(result[4,]) == TRUE)/totalDay),
+        #round(length(which(result[5,]) == TRUE)/totalDay), round(length(which(result[6,]) == TRUE)/totalDay)
+        )
 }
 
 makeTable<-function(tableName, startTime, mins) {
@@ -162,113 +157,40 @@ makeTable<-function(tableName, startTime, mins) {
   return(tableName)
 }
 
-
-### 查看每天的各个时刻跑步人数 ###
-# cl<-makeCluster(4)
-# workdayTable<-makeTable(mondayTable, "06:30", 60*13)
-# result<-as.data.frame(t(parApply(cl, workdayTable, 1, setTimeNo, monday, countTime, "Var1", weekAmount*5)))
-# colmonday<-cbind(workdayTable, result)
-# colnames(colmonday)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colmonday, "mondaySummary.xlsx", sheetName = "monday", row.names = FALSE, append = FALSE)
-# 
-# workdayTable<-makeTable(tuesdayTable, "06:30", 60*13)
-# result<-as.data.frame(t(parApply(cl, workdayTable, 1, setTimeNo, tuesday, countTime, "Var1", weekAmount*5)))
-# coltuesday<-cbind(workdayTable, result)
-# colnames(coltuesday)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(coltuesday, "tuesdaySummary.xlsx", sheetName = "tuesday", row.names = FALSE, append = FALSE)
-# 
-# workdayTable<-makeTable(saturdayTable, "06:30", 60*13)
-# result<-as.data.frame(t(parApply(cl, workdayTable, 1, setTimeNo, saturday, countTime, "Var1", weekAmount*5)))
-# colsaturday<-cbind(workdayTable, result)
-# colnames(colsaturday)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colsaturday, "saturdaySummary.xlsx", sheetName = "saturday", row.names = FALSE, append = FALSE)
-# 
-# workdayTable<-makeTable(thursdayTable, "06:30", 60*13)
-# result<-as.data.frame(t(parApply(cl, workdayTable, 1, setTimeNo, thursday, countTime, "Var1", weekAmount*5)))
-# colthursday<-cbind(workdayTable, result)
-# colnames(colthursday)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colthursday, "thursdaySummary.xlsx", sheetName = "thursday", row.names = FALSE, append = FALSE)
-# 
-# workdayTable<-makeTable(fridayTable, "06:30", 60*13)
-# result<-as.data.frame(t(parApply(cl, workdayTable, 1, setTimeNo, friday, countTime, "Var1", weekAmount*5)))
-# colfriday<-cbind(workdayTable, result)
-# colnames(colfriday)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colfriday, "fridaySummary.xlsx", sheetName = "friday", row.names = FALSE, append = FALSE)
-# 
-# workdayTable<-makeTable(saturdayTable, "09:00", 60*13)
-# result<-as.data.frame(t(parApply(cl, workdayTable, 1, setTimeNo, saturday, countTime, "Var1", weekAmount*5)))
-# colsaturday<-cbind(workdayTable, result)
-# colnames(colsaturday)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colsaturday, "saturdaySummary.xlsx", sheetName = "saturday", row.names = FALSE, append = FALSE)
-# 
-# workdayTable<-makeTable(sundayTable, "09:00", 60*13)
-# result<-as.data.frame(t(parApply(cl, workdayTable, 1, setTimeNo, sunday, countTime, "Var1", weekAmount*5)))
-# colsunday<-cbind(workdayTable, result)
-# colnames(colsunday)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colsunday, "sundaySummary.xlsx", sheetName = "sunday", row.names = FALSE, append = FALSE)
-# stopCluster(cl)
-
-
-#### 横向显示类别
-# wdMTable<-makeTable(wdMTable, "06:30", 60)
-# result<-as.data.frame(t(parApply(cl, wdMTable, 1, setTimeNo, weekdayData, countTime, "Var1", weekAmount*5)))
-# colWdM<-cbind(wdMTable, result)
-# colnames(colWdM)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colWdM, "TimeSummary.xlsx", sheetName = "WdM", row.names = FALSE, append = FALSE)
-# 
-# wdATable<-makeTable(wdATable, "15:00", 60*4)
-# result<-as.data.frame(t(parApply(cl, wdATable, 1, setTimeNo, weekdayData, countTime, "Var1", weekAmount*5)))
-# colwdA<-cbind(wdATable, result)
-# colnames(colwdA)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colwdA, "TimeSummary.xlsx", sheetName = "wdA", row.names = FALSE, append = FALSE)
-# 
-# weMTable<-makeTable(weMTable, "09:00", 60*2)
-# result<-as.data.frame(t(parApply(cl, weMTable, 1, setTimeNo, weekdayData, countTime, "Var1", weekAmount*5)))
-# colweM<-cbind(weMTable, result)
-# colnames(colweM)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colweM, "TimeSummary.xlsx", sheetName = "weM", row.names = FALSE, append = FALSE)
-# 
-# weATable<-makeTable(weATable, "15:00", 60*4)
-# result<-as.data.frame(t(parApply(cl, weATable, 1, setTimeNo, weekdayData, countTime, "Var1", weekAmount*5)))
-# colweA<-cbind(weATable, result)
-# colnames(colweA)<-c("Var1", "17", "17East", "17West", "18", "18East", "18West")
-# write.xlsx(colweA, "TimeSummary.xlsx", sheetName = "weA", row.names = FALSE, append = FALSE)
-
-
-
 ##### 制作以工作日、周末为分类的 17、18 级分时人流量图表 #####
+cl<-makeCluster(4)
 ## 数据汇总
 wdMTable<-makeTable(wdMTable, "06:30", 60)
-result<-as.data.frame(t(parApply(cl, wdMTable, 1, setTimeNo, weekdayData, countTime, "Var1", weekAmount*5)))
-wdMTable<-cbind(wdMTable, result[2], "17级")
+result<-as.data.frame(t(parApply(cl, wdMTable, 1, setTimeNo, weekday, countTime, "Var1", weekAmount*5)))
+wdMTable<-cbind(wdMTable, result[1], "17级")
 colnames(wdMTable)<-c("Var1", "Freq", "Grade")
-result17<-cbind(wdMTable[1], result[1], "18级")
-colnames(result17)<-c("Var1", "Freq", "Grade")
-wdMTable<-rbind(wdMTable, result17)
+result18<-cbind(wdMTable[1], result[2], "18级")
+colnames(result18)<-c("Var1", "Freq", "Grade")
+wdMTable<-rbind(wdMTable, result18)
 
 wdATable<-makeTable(wdATable, "15:00", 60*4)
-result<-as.data.frame(t(parApply(cl, wdATable, 1, setTimeNo, weekdayData, countTime, "Var1", weekAmount*5)))
-wdATable<-cbind(wdATable, result[2], "17级")
+result<-as.data.frame(t(parApply(cl, wdATable, 1, setTimeNo, weekday, countTime, "Var1", weekAmount*5)))
+wdATable<-cbind(wdATable, result[1], "17级")
 colnames(wdATable)<-c("Var1", "Freq", "Grade")
-result17<-cbind(wdATable[1], result[1], "18级")
-colnames(result17)<-c("Var1", "Freq", "Grade")
-wdATable<-rbind(wdATable, result17)
+result18<-cbind(wdATable[1], result[2], "18级")
+colnames(result18)<-c("Var1", "Freq", "Grade")
+wdATable<-rbind(wdATable, result18)
 
 weMTable<-makeTable(weMTable, "09:00", 60*2)
-result<-as.data.frame(t(parApply(cl, weMTable, 1, setTimeNo, weekendData, countTime, "Var1", weekAmount*5)))
-weMTable<-cbind(weMTable, result[2], "17级")
+result<-as.data.frame(t(parApply(cl, weMTable, 1, setTimeNo, weekend, countTime, "Var1", weekAmount*2)))
+weMTable<-cbind(weMTable, result[1], "17级")
 colnames(weMTable)<-c("Var1", "Freq", "Grade")
-result17<-cbind(weMTable[1], result[1], "18级")
-colnames(result17)<-c("Var1", "Freq", "Grade")
-weMTable<-rbind(weMTable, result17)
+result18<-cbind(weMTable[1], result[2], "18级")
+colnames(result18)<-c("Var1", "Freq", "Grade")
+weMTable<-rbind(weMTable, result18)
 
 weATable<-makeTable(weATable, "15:00", 60*4)
-result<-as.data.frame(t(parApply(cl, weATable, 1, setTimeNo, weekendData, countTime, "Var1", weekAmount*5)))
-weATable<-cbind(weATable, result[2], "17级")
+result<-as.data.frame(t(parApply(cl, weATable, 1, setTimeNo, weekend, countTime, "Var1", weekAmount*2)))
+weATable<-cbind(weATable, result[1], "17级")
 colnames(weATable)<-c("Var1", "Freq", "Grade")
-result17<-cbind(weATable[1], result[1], "18级")
-colnames(result17)<-c("Var1", "Freq", "Grade")
-weATable<-rbind(weATable, result17)
+result18<-cbind(weATable[1], result[2], "18级")
+colnames(result18)<-c("Var1", "Freq", "Grade")
+weATable<-rbind(weATable, result18)
 stopCluster(cl)
 
 ## 图表绘制
